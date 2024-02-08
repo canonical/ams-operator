@@ -1,18 +1,24 @@
+"""Module to configure AMS for charms."""
 #
 # Copyright 2024 Canonical Ltd.  All rights reserved.
 #
 
 import os
-
-from ops.model import BlockedStatus
-import netifaces
-from jinja2 import Environment, FileSystemLoader
 from pathlib import Path
+
+import netifaces
 import ops
-from charms.operator_libs_linux.v2 import snap
-from charms.operator_libs_linux.v1 import systemd
 from charms.operator_libs_linux.v0 import passwd
-from charms.tls_certificates_interface.v2.tls_certificates import generate_ca, generate_certificate, generate_csr, generate_private_key
+from charms.operator_libs_linux.v1 import systemd
+from charms.operator_libs_linux.v2 import snap
+from charms.tls_certificates_interface.v2.tls_certificates import (
+    generate_ca,
+    generate_certificate,
+    generate_csr,
+    generate_private_key,
+)
+from jinja2 import Environment, FileSystemLoader
+from ops.model import BlockedStatus
 
 SNAP_NAME = "ams"
 SNAP_COMMON_PATH = Path(f"/var/snap/{SNAP_NAME}/common")
@@ -21,9 +27,9 @@ CLIENT_CONFIG_FOLDER = SNAP_COMMON_PATH / "client"
 REGISTRY_CONFIG_FOLDER = SNAP_COMMON_PATH / "registry"
 AMS_REGISTRY_CERT = REGISTRY_CONFIG_FOLDER / "client.crt"
 
-AMS_CONFIG_PATH = SNAP_COMMON_PATH  / "conf/main.yaml"
+AMS_CONFIG_PATH = SNAP_COMMON_PATH / "conf/main.yaml"
 
-AMS_CERT_BASE_PATH =  SNAP_COMMON_PATH / "certs"
+AMS_CERT_BASE_PATH = SNAP_COMMON_PATH / "certs"
 
 AMS_SERVER_CERT_PATH = AMS_CERT_BASE_PATH / "server.crt"
 AAR_SERVER_KEY_PATH = AMS_CERT_BASE_PATH / "server.key"
@@ -31,25 +37,28 @@ AAR_SERVER_KEY_PATH = AMS_CERT_BASE_PATH / "server.key"
 CLIENTS_CERT_PATH = AMS_CERT_BASE_PATH / "clients"
 PUBLISHERS_CERT_PATH = AMS_CERT_BASE_PATH / "publishers"
 
-SERVICE = 'snap.ams.ams.service'
-SERVICE_DROP_IN_FOLDER = Path(f'/etc/systemd/system/{SERVICE}.d')
-SERVICE_DROP_IN_PATH = SERVICE_DROP_IN_FOLDER / '10-ams-unix-socket-chown.conf'
-GROUP_NAME = 'ams'
+SERVICE = "snap.ams.ams.service"
+SERVICE_DROP_IN_PATH = Path(f"/etc/systemd/system/{SERVICE}.d/10-ams-unix-socket-chown.conf")
+GROUP_NAME = "ams"
 
 
 class AMS:
+    """Class for handling AMS configurations."""
 
     def __init__(self, charm: ops.CharmBase):
         self._sc = snap.SnapCache()
         self._charm = charm
 
     def restart(self):
-        self._sc['ams'].restart()
+        """Restart AMS Snap."""
+        self._sc["ams"].restart()
 
     def remove(self):
-        self._sc['ams']._remove()
+        """Remove AMS Snap."""
+        self._sc["ams"]._remove()
 
     def install(self):
+        """Install AMS including its Snap."""
         try:
             res = self._charm.model.resources.fetch("ams-snap")
         except ops.ModelError:
@@ -68,7 +77,7 @@ class AMS:
         ams_snap.alias("amc", "amc")
 
         passwd.add_group(GROUP_NAME)
-        passwd.add_user_to_group('ubuntu', GROUP_NAME)
+        passwd.add_user_to_group("ubuntu", GROUP_NAME)
         self._create_systemd_drop_in()
 
     def _create_systemd_drop_in(self):
@@ -79,10 +88,9 @@ class AMS:
                 "group": GROUP_NAME,
             }
         )
-        SERVICE_DROP_IN_FOLDER.mkdir(exist_ok=True)
+        SERVICE_DROP_IN_PATH.parent.mkdir(parents=True, exist_ok=True)
         SERVICE_DROP_IN_PATH.write_text(rendered_content)
         systemd.daemon_reload()
-
 
     # TODO: remove this function to get snap from SnapCache()['ams'] after the
     # snap is made publicly available in the snap store
@@ -95,6 +103,7 @@ class AMS:
 
     @property
     def version(self) -> str:
+        """Return AMS version."""
         _snap = self._get_snap()
         if not _snap:
             raise snap.SnapNotFoundError(SNAP_NAME)
@@ -102,6 +111,7 @@ class AMS:
 
     @property
     def installed(self) -> bool:
+        """Check if AMS is installed."""
         _snap = self._get_snap()
         if not _snap:
             return False
@@ -115,12 +125,14 @@ class AMS:
             raise Exception("No IP associated to requested device")
         return addresses[netifaces.AF_INET][0]["addr"]
 
-    def configure(self,
-          port: ops.Port,
-          storage_config: str,
-          listen_address: str,
-          ingress_address: str,
+    def configure(
+        self,
+        port: ops.Port,
+        storage_config: str,
+        listen_address: str,
+        ingress_address: str,
     ):
+        """Configure AMS snap."""
         tenv = Environment(loader=FileSystemLoader("templates"))
         template = tenv.get_template("config.yaml.j2")
         rendered_content = template.render(
@@ -133,7 +145,6 @@ class AMS:
         self._setup_certs(ingress_address, ingress_address, listen_address)
 
     def _setup_certs(self, hostname: str, public_ip: str, private_ip: str):
-
         cert_base_path = os.path.dirname(AMS_CERT_BASE_PATH)
         if not os.path.exists(cert_base_path):
             os.makedirs(cert_base_path, mode=0o0700)
@@ -167,10 +178,10 @@ class AMS:
 
         key = generate_private_key(key_size=4096)
         csr = generate_csr(
-                private_key=key,
-                subject=hostname,
-                sans_dns=[public_ip, private_ip, hostname],
-                sans_ip=[public_ip,private_ip] )
+            private_key=key,
+            subject=hostname,
+            sans_dns=[public_ip, private_ip, hostname],
+            sans_ip=[public_ip, private_ip],
+        )
         cert = generate_certificate(csr=csr, ca=ca_cert, ca_key=ca_key)
         return cert, key
-

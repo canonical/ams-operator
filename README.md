@@ -30,7 +30,7 @@ Running the `AMS` charm requires other charms to be deployed beforehand.
 
 ```sh
 $ juju deploy etcd
-$ juju deploy containers-easyrsa
+$ juju deploy easyrsa
 $ juju relate etcd easyrsa
 ```
 
@@ -38,7 +38,6 @@ Then deploy `ams`
 
 ```sh
 $ juju deploy ams
-$ juju config ams ua_token=<your UA token>
 $ juju relate ams etcd
 ```
 
