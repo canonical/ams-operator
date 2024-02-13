@@ -1,0 +1,53 @@
+listen-address: {{ ip }}:{{ port }}
+logger:
+  level: {{ log_level }}
+
+store:
+{% if store.use_embedded %}
+  driver: embedded-etcd
+  data: "/var/snap/ams/common/etcd-data"
+{% else %}
+  driver: etcd
+  data:
+    servers: {{ store.servers }}
+    key: {{ store.key }}
+    cert: {{ store.cert }}
+    ca: {{ store.ca }}
+{% endif %}
+
+artifacts:
+  provider: filesystem
+  path: /var/snap/ams/common/data/artifacts
+
+backend:
+  port-range: {{ backend.port_range }}
+  default-session-specification:
+    log-level: {{ log_level }}
+    metrics-server: {{ backend.metrics_server }}
+  force-tls12: {{ backend.force_tls12 }}
+  use-network-acl: {{ backend.use_network_acl }}
+  {%- if backend.lxd_project|length > 0 %}
+  lxd:
+    project: {{ backend.lxd_project }}
+  {%- endif %}
+
+{% if metrics.enabled %}
+metrics:
+  prometheus:
+    {%- if metrics.extra_labels|length > 0 %}
+    extra-labels:
+    {%- for key, value in metrics.extra_labels.items() %}
+      "{{ key }}": "{{ value }}"
+    {%- endfor%}
+    {%- endif %}
+    listen-address: {{ metrics.ip }}:{{ metrics.port }}
+    {% if metrics.basic_auth_username|length and metrics.basic_auth_password|length -%}
+    username: {{metrics.basic_auth_username}}
+    password: {{metrics.basic_auth_password}}
+    {%- endif %}
+    {% if metrics.tls_key|length and metrics.tls_cert|length -%}
+    tls:
+      key: {{metrics.tls_key}}
+      cert: {{metrics.tls_cert}}
+    {%- endif %}
+{% endif %}

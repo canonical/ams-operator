@@ -1,0 +1,124 @@
+# This file defines charm config options, and populates the Configure tab on Charmhub.
+# If your charm does not require configuration options, delete this file entirely.
+#
+# See https://juju.is/docs/config for guidance.
+
+options:
+  port:
+    type: int
+    default: 8444
+    description: Port where AMS binds to
+  storage_device:
+    type: string
+    default: ""
+    description: Path to storage device to be used on this node (i. e. "/dev/sdb")
+  storage_pool:
+    type: string
+    default: ""
+    description: |
+      Name of a LXD storage pool to use instead of creating a custom one. This will
+      only work when using LXD clusters not managed by AMS via the lxd-integrator charm.
+  log_level:
+    type: string
+    default: "info"
+    description: Logging level. Allowed values are debug, info, warning, error and critical
+  prometheus_target_port:
+    type: int
+    default: 9104
+    description: Port where Prometheus target binds to
+  prometheus_metrics_path:
+    type: string
+    default: /internal/1.0/metrics
+    description: The path where AMS exposes the metrics for Prometheus
+  prometheus_tls_cert_path:
+    type: string
+    default: ""
+    description: Path to certificate used by prometheus for TLS
+  prometheus_tls_key_path:
+    type: string
+    default: ""
+    description: Path to key used by prometheus for TLS
+  prometheus_basic_auth_username:
+    type: string
+    default: ""
+    description: Username used for HTTP basic auth of the prometheus endpoint
+  prometheus_basic_auth_password:
+    type: string
+    default: ""
+    description: Password used for HTTP basic auth of the prometheus endpoint
+  prometheus_extra_labels:
+    type: string
+    default: ""
+    description: Comma separated list of extra labels (key=value) to add to every reported metric
+  port_range:
+    type: string
+    default: "10000-11000"
+    description: Port range to be assigned for container creation
+  metrics_server:
+    type: string
+    default: ""
+    description: |
+      The endpoint where all containers will send their metrics to. It might be
+      overriden by a REST API request to AMS when a container is launched. If no
+      value is set, AMS will take a reasonable default.
+      The format of the value is 'influxdb:[username:password@]<IP address or DNS name>[:<port>]'
+  config:
+    type: string
+    default: ""
+    description: |
+      Configuration options for the AMS service. Multiple options are separated by a new
+      line and the format of each option is `<name>=<value>`.
+  nagios_context:
+    default: "juju"
+    type: string
+    description: |
+      Used by the nrpe subordinate charms.
+      A string that will be prepended to instance name to set the host name
+      in nagios. So for instance the hostname would be something like:
+        juju-myservice-0
+      If you're running multiple environments with the same services in them
+      this allows you to differentiate between them.
+  nagios_servicegroups:
+    default: ""
+    type: string
+    description: |
+      A comma-separated list of nagios servicegroups.
+      If left empty, the nagios_context will be used as the servicegroup
+  registry_mode:
+    default: ""
+    type: string
+    description: |
+      Override the mode the registry is configured in
+  lxd_project:
+    default: ""
+    type: string
+    description: |
+      LXD project AMS should use. MUST be set before any LXD node is added to AMS.
+      Changing it afterwards will cause undefined behavior.
+  force_tls12:
+    default: false
+    type: boolean
+    description: |
+      AMS enforces the use TLS version 1.3 since the 1.15.0 release. To allow older clients
+      not supporting TLS 1.3 to still connect this configuration option allows users to allow
+      TLS 1.2 again. Please note that this is affecting the security of your installation and
+      should only applied with great care.
+  use_network_acl:
+    default: false
+    type: boolean
+    description: |
+      This configuration option enables AMS to use LXD networking ACLs rather than the node
+      controller which is used by default to restrict the network access of AMS containers.
+      NOTE: this is not a runtime configuration item and it should only be set at deployment time.
+  location:
+    type: string
+    default: ""
+    description: |
+      Location AMS is available on. If not set the private address will
+      be used.
+  use_embedded_etcd:
+    type: boolean
+    default: false
+    description: |
+      Use an embedded etcd database rather than connecting to an external host one
+
