@@ -26,15 +26,10 @@ ETCD_CERT_PATH = ETCD_BASE_PATH / "client-cert.pem"
 ETCD_KEY_PATH = ETCD_BASE_PATH / "client-key.pem"
 
 AMS_CONFIG_PATH = SNAP_COMMON_PATH / "server/settings.yaml"
-CLIENT_CONFIG_FOLDER = SNAP_COMMON_PATH / "client"
-REGISTRY_CONFIG_FOLDER = SNAP_COMMON_PATH / "registry"
 
-AMS_CERT_BASE_PATH = SNAP_COMMON_PATH / "certs"
-AMS_REGISTRY_CERT = REGISTRY_CONFIG_FOLDER / "client.crt"
-AMS_SERVER_CERT_PATH = AMS_CERT_BASE_PATH / "server.crt"
-AAR_SERVER_KEY_PATH = AMS_CERT_BASE_PATH / "server.key"
-CLIENTS_CERT_PATH = AMS_CERT_BASE_PATH / "clients"
-PUBLISHERS_CERT_PATH = AMS_CERT_BASE_PATH / "publishers"
+LXD_CLIENT_CONFIG_FOLDER = SNAP_COMMON_PATH / "lxd"
+LXD_CLIENT_CERT_PATH = LXD_CLIENT_CONFIG_FOLDER / "client.crt"
+LXD_CLIENT_KEY_PATH = LXD_CLIENT_CONFIG_FOLDER / "client.key"
 
 SERVICE = "snap.ams.ams.service"
 SERVICE_DROP_IN_PATH = Path(f"/etc/systemd/system/{SERVICE}.d/10-ams-unix-socket-chown.conf")
@@ -144,6 +139,12 @@ class AMS:
         passwd.add_group(GROUP_NAME)
         passwd.add_user_to_group("ubuntu", GROUP_NAME)
         self._create_systemd_drop_in()
+
+    def setup_lxd(self, key: bytes, cert: bytes):
+        """Create certificates for Etcd."""
+        LXD_CLIENT_CONFIG_FOLDER.mkdir(exist_ok=True, parents=True)
+        LXD_CLIENT_CERT_PATH.write_bytes(cert)
+        LXD_CLIENT_KEY_PATH.write_bytes(key)
 
     def setup_etcd(self, ca: str, key: str, cert: str):
         """Create certificates for Etcd."""

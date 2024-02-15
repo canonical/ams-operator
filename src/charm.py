@@ -4,11 +4,18 @@
 #
 
 """Operator Charm for AMS."""
+import json
 import logging
 
 from ams import AMS, BackendConfig, ETCDConfig, PrometheusConfig, ServiceConfig
+from charms.tls_certificates_interface.v3.tls_certificates import (
+    generate_ca,
+    generate_certificate,
+    generate_csr,
+    generate_private_key,
+)
 from interfaces.etcd import ETCDEndpointConsumer
-from ops.charm import CharmBase, ConfigChangedEvent, InstallEvent
+from ops.charm import CharmBase, ConfigChangedEvent, InstallEvent, RelationJoinedEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
@@ -30,6 +37,14 @@ class AmsOperatorCharm(CharmBase):
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.etcd.on.available, self._on_etcd_available)
+        self.framework.observe(
+            self.on["lxd-cluster"].relation_joined, self._on_lxd_integrator_joined
+        )
+
+    @property
+    def public_ip(self) -> str:
+        """Public address of the unit."""
+        return self.model.get_binding("juju-info").network.ingress_address.exploded
 
     @property
     def private_ip(self) -> str:
@@ -70,6 +85,7 @@ class AmsOperatorCharm(CharmBase):
         )
         if self.config["metrics_server"]:
             backend_cfg.metrics_server = f"influxdb:{self.config['metrics_server']}"
+
         metrics_cfg = PrometheusConfig(
             ip=self.private_ip,
             port=int(self.config["prometheus_target_port"]),
@@ -92,6 +108,35 @@ class AmsOperatorCharm(CharmBase):
         self._snap.set_location(self.config["location"], self.config["port"])
         self.unit.set_ports(int(self.config["port"]))
         self.unit.status = ActiveStatus()
+
+    def _on_lxd_integrator_joined(self, event: RelationJoinedEvent):
+        cert, key = self._generate_selfsigned_cert(self.public_ip, self.public_ip, self.private_ip)
+        self._snap.setup_lxd(cert=cert, key=key)
+        relation_data = event.relation.data[self.unit]
+        relation_data["client_certificates"] = json.dumps([cert.decode("utf-8")])
+
+    def _generate_selfsigned_cert(self, hostname, public_ip, private_ip) -> tuple[bytes, bytes]:
+        if not hostname:
+            raise Exception("A hostname is required")
+
+        if not public_ip:
+            raise Exception("A public IP is required")
+
+        if not private_ip:
+            raise Exception("A private IP is required")
+
+        ca_key = generate_private_key(key_size=4096)
+        ca_cert = generate_ca(ca_key, hostname)
+
+        key = generate_private_key(key_size=4096)
+        csr = generate_csr(
+            private_key=key,
+            subject=hostname,
+            sans_dns=[public_ip, private_ip, hostname],
+            sans_ip=[public_ip, private_ip],
+        )
+        cert = generate_certificate(csr=csr, ca=ca_cert, ca_key=ca_key)
+        return cert, key
 
 
 if __name__ == "__main__":  # pragma: nocover

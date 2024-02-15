@@ -59,7 +59,7 @@ options:
     default: ""
     description: |
       The endpoint where all containers will send their metrics to. It might be
-      overriden by a REST API request to AMS when a container is launched. If no
+      overridden by a REST API request to AMS when a container is launched. If no
       value is set, AMS will take a reasonable default.
       The format of the value is 'influxdb:[username:password@]<IP address or DNS name>[:<port>]'
   config:
