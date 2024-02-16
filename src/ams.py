@@ -1,10 +1,25 @@
 """Module to configure AMS for charms."""
+# -*- coding: utf-8 -*-
 #
-# Copyright 2024 Canonical Ltd.  All rights reserved.
+#  Copyright 2024 Canonical Ltd.
 #
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
 
+import json
 import logging
+import shutil
 import subprocess
+import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -111,8 +126,10 @@ class AMS:
         self._sc["ams"].restart()
 
     def remove(self):
-        """Remove AMS Snap."""
-        self._sc["ams"]._remove()
+        """Remove AMS users, drop-in service and the snap."""
+        self._sc["ams"].remove()
+        shutil.rmtree(SERVICE_DROP_IN_PATH.parent)
+        passwd.remove_group(GROUP_NAME)
 
     def install(self):
         """Install AMS including its Snap."""
@@ -205,14 +222,22 @@ class AMS:
 
         self._sc["ams"].start(enable=True)
 
+    @property
+    def is_running(self):
+        """Check if the service is running."""
+        return systemd.service_running(SERVICE)
+
     def set_location(self, location, port):
         """Set location configuration item for AMS."""
-        curr_config = self._get_config()
-        logger.info(curr_config)
+        curr_config = self.get_config_item("load_balancer.url")
         url = f"https://{location}:{port}"
-        if curr_config["load_balancer.url"] == url:
+        if curr_config == url:
             return
         self._set_config_item("load_balancer.url", url)
+
+    def get_config_item(self, item: str) -> str:
+        """Get service configuration item from AMS."""
+        return self._get_config().get(item, "")
 
     def _get_config(self) -> dict:
         output = subprocess.run(
@@ -222,3 +247,44 @@ class AMS:
 
     def _set_config_item(self, name, value):
         subprocess.run(["/snap/bin/amc", "config", "set", name, value], check=True)
+
+    def get_registered_certificates(self) -> list[dict[str, str]]:
+        """Get registered client with AMS."""
+        result = subprocess.run(
+            ["/snap/bin/amc", "config", "trust", "ls", "--format", "json"], capture_output=True
+        )
+        return json.loads(result.stdout.decode())
+
+    def register_client(self, cert: str) -> str:
+        """Register a new client with AMS and return its fingerprint."""
+        current_certs = self.get_registered_certificates()
+        current_fp = set()
+        for crt in current_certs:
+            current_fp.add(crt["fingerprint"])
+        with tempfile.NamedTemporaryFile(delete=False, dir=SNAP_COMMON_PATH, suffix=".crt") as f:
+            f.write(cert.encode())
+            f.close()
+            result = subprocess.run(
+                ["/snap/bin/amc", "config", "trust", "add", f.name],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+            )
+            if "already exists" in result.stdout.decode():
+                logger.info("Skipped registration for client. Certificate already registered")
+                return ""
+            else:
+                result.check_returncode()
+                logger.info("Registered new client")
+        updated_certs = self.get_registered_certificates()
+        updated_fp = set()
+        for crt in updated_certs:
+            updated_fp.add(crt["fingerprint"])
+        new_fp = updated_fp - current_fp
+        if not new_fp:
+            raise Exception("Failed to register certificate")
+        return new_fp.pop()
+
+    def unregister_client(self, fingerprint: str):
+        """Remove client from AMS."""
+        subprocess.run(["/snap/bin/amc", "config", "trust", "remove", fingerprint], check=True)
+        logger.info("Client unregistered successfully. Certificate removed")

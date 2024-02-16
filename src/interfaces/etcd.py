@@ -66,7 +66,6 @@ class ETCDEndpointConsumer(ops.framework.Object):
 
     def get_config(self) -> dict:
         """Get configuration from etcd relation."""
-        self.framework.breakpoint("tester")
         return {
             "cert": self._state.cert,
             "ca": self._state.ca,
