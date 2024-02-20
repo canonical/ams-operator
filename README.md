@@ -14,6 +14,11 @@ management for hosted containers.
 
 Also have a look at the official Anbox Cloud website (https://anbox-cloud.io) for more information.
 
+> NOTE: Anbox Cloud is a paid offering. You will need a [Ubuntu Pro](https://ubuntu.com/pro) subscription
+> for this charm to work. To achieve this with `juju` another charm can be used to attach the machine to
+> the AMS Operator. The [ubuntu-advantage](https://charmhub.io/ubuntu-advantage) acts as a subordinate charm
+> to attach the machine to Pro.
+
 ## Anbox Management System
 
 The Anbox Management System, or *ams* is the main piece of software responsible for managing containers,

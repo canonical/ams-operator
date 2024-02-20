@@ -30,7 +30,7 @@ from charms.operator_libs_linux.v0 import passwd
 from charms.operator_libs_linux.v1 import systemd
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Environment, FileSystemLoader
-from ops.model import BlockedStatus
+from ops.model import BlockedStatus, MaintenanceStatus
 
 SNAP_NAME = "ams"
 SNAP_COMMON_PATH = Path(f"/var/snap/{SNAP_NAME}/common")
@@ -133,6 +133,7 @@ class AMS:
 
     def install(self):
         """Install AMS including its Snap."""
+        self._charm.unit.status = MaintenanceStatus("Installing AMS")
         try:
             res = self._charm.model.resources.fetch("ams-snap")
         except ops.ModelError:

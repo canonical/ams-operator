@@ -22,6 +22,13 @@ provides:
   rest-api:
     interface: rest
 requires:
+  # The implicit relation for `juju-info` does not trigger the AMS charm's
+  # deferred events to continue installation. We require this relation to
+  # trigger the AMS charm when the ubuntu-advantage subordinate charm is
+  # connected and subscribes the machine to ubuntu pro.
+  ua-attach:
+    interface: juju-info
+    scope: container
   lxd-cluster:
     interface: lxd
   etcd:

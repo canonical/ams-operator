@@ -39,14 +39,11 @@ from ops.charm import (
 )
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ua import Pro
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
-
-
-def _is_pro_attached():
-    return True
 
 
 class AmsOperatorCharm(CharmBase):
@@ -80,8 +77,11 @@ class AmsOperatorCharm(CharmBase):
         return self.model.get_binding("juju-info").network.bind_address.exploded
 
     def _on_install(self, event: InstallEvent):
-        if not _is_pro_attached():
-            self.unit.status = BlockedStatus("Waiting for Ubuntu Pro attachment")
+        if not Pro.is_attached():
+            self.unit.status = WaitingStatus("Waiting for UA attachment")
+            event.defer()
+            return
+        Pro.enable_anbox_cloud_if_needed()
         self._snap.install()
         self.unit.set_workload_version(self._snap.version)
 
@@ -95,7 +95,10 @@ class AmsOperatorCharm(CharmBase):
         self._snap.remove()
 
     def _on_config_changed(self, event: ConfigChangedEvent):
-        self.unit.status = WaitingStatus("Configuring AMS")
+        if not self._snap.installed:
+            event.defer()
+            return
+        self.unit.status = MaintenanceStatus("Configuring AMS")
         etcd_cfg = ETCDConfig(
             use_embedded=self.config["use_embedded_etcd"],
         )
