@@ -16,6 +16,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from ops import BlockedStatus
 from ops.testing import Harness
 
 from src.charm import AmsOperatorCharm
@@ -47,3 +48,22 @@ def test_on_install_with_ams_resource(request):
         harness.charm.on.install.emit()
         mocked_server_path.parent.mkdir.assert_called_once()
         mocked_snap.install_local.assert_called_once()
+
+
+def test_blocks_on_external_etcd_if_not_embedded(request):
+    with patch("ams.snap") as mocked_snap, patch("ams.passwd"), patch("ams.systemd"), patch(
+        "ams.SERVICE_DROP_IN_PATH"
+    ) as mocked_server_path:
+        harness = Harness(AmsOperatorCharm)
+        mocked_snap.install_local = MagicMock()
+        fake_snap = MagicMock()
+        fake_snap._snap_client.get_installed_snaps.return_value = [
+            {"name": "ams", "version": "x1"}
+        ]
+        mocked_snap.SnapCache.return_value = fake_snap
+        request.addfinalizer(harness.cleanup)
+        harness.add_resource("ams-snap", "ams.snap")
+        harness.begin_with_initial_hooks()
+        mocked_server_path.parent.mkdir.assert_called_once()
+        mocked_snap.install_local.assert_called_once()
+        assert harness.charm.unit.status == BlockedStatus("Waiting for etcd")
