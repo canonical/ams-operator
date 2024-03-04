@@ -140,6 +140,8 @@ class AMS:
             if res is not None and res.stat().st_size:
                 snap.install_local(res, classic=False, dangerous=True)
                 logger.info("Installed AMS snap from local snap resource")
+            else:
+                raise Exception("Invalid format for `ams-snap` resource")
         except ops.ModelError:
             self._charm.unit.status = BlockedStatus("Waiting for AMS snap resource")
             raise

@@ -55,4 +55,10 @@ jobs:
           juju-channel: "${{ env.channel }}"
           bootstrap-options: "--agent-version ${{ matrix.agent-versions }}"
       - name: Run integration tests
-        run: tox -e integration-${{ env.libjuju }}
+        env:
+            snap_channel: 1.21/stable
+            UBUNTU_STORE_AUTH: {{ secrets.SNAPSTORE_TOKEN }}
+        run: |
+          mkdir -p snaps/
+          snap download --basename=ams --channel={{ env.snap_channel }} --target-directory=./snaps/ ams
+          tox -e integration-${{ env.libjuju }} -- --ams-snap ./snaps/ams.snap
