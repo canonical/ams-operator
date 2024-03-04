@@ -16,6 +16,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 import ast
 import json
 import logging
@@ -39,7 +41,7 @@ from ops.charm import (
 )
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus, ModelError
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -82,7 +84,12 @@ class AmsOperatorCharm(CharmBase):
     def _on_install(self, event: InstallEvent):
         if not _is_pro_attached():
             self.unit.status = BlockedStatus("Waiting for Ubuntu Pro attachment")
-        self._snap.install()
+            return
+        try:
+            self._snap.install()
+        except Exception:
+            event.defer()
+            return
         self.unit.set_workload_version(self._snap.version)
 
     def _on_upgrade(self, _: UpgradeCharmEvent):
@@ -196,7 +203,7 @@ class AmsOperatorCharm(CharmBase):
         self._snap.unregister_client(fp)
 
     @staticmethod
-    def _generate_selfsigned_cert(hostname, public_ip, private_ip) -> tuple[bytes, bytes]:
+    def _generate_selfsigned_cert(hostname, public_ip, private_ip) -> Tuple[bytes, bytes]:
         if not hostname:
             raise Exception("A hostname is required")
 
