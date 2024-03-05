@@ -62,6 +62,7 @@ class AmsOperatorCharm(CharmBase):
         self._state.set_default(registered_clients=set())
         self.etcd = ETCDEndpointConsumer(self, "etcd")
         self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.upgrade_charm, self._on_upgrade)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.etcd.on.available, self._on_etcd_available)
