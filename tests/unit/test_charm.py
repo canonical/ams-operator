@@ -50,6 +50,25 @@ def test_on_install_with_ams_resource(request):
         mocked_snap.install_local.assert_called_once()
 
 
+def test_charm_sets_workload_version_on_install(request):
+    with patch("ams.snap") as mocked_snap, patch("ams.passwd"), patch("ams.systemd"), patch(
+        "ams.SERVICE_DROP_IN_PATH"
+    ):
+        harness = Harness(AmsOperatorCharm)
+        mocked_snap.install_local = MagicMock()
+        fake_snap = MagicMock()
+        workload_version = "x1"
+        fake_snap._snap_client.get_installed_snaps.return_value = [
+            {"name": "ams", "version": workload_version}
+        ]
+        mocked_snap.SnapCache.return_value = fake_snap
+        request.addfinalizer(harness.cleanup)
+        harness.begin()
+        harness.add_resource("ams-snap", "ams.snap")
+        harness.charm.on.install.emit()
+        assert harness.charm.app._backend._workload_version == workload_version
+
+
 def test_blocks_on_external_etcd_if_not_embedded(request):
     with patch("ams.snap") as mocked_snap, patch("ams.passwd"), patch("ams.systemd"), patch(
         "ams.SERVICE_DROP_IN_PATH"
@@ -67,3 +86,39 @@ def test_blocks_on_external_etcd_if_not_embedded(request):
         mocked_server_path.parent.mkdir.assert_called_once()
         mocked_snap.install_local.assert_called_once()
         assert harness.charm.unit.status == BlockedStatus("Waiting for etcd")
+
+
+def test_can_apply_config_items_to_ams(request):
+    with patch("src.charm.AMS"):
+        charm_cls = AmsOperatorCharm
+        charm_cls.private_ip = "10.0.0.1"
+        harness = Harness(charm_cls)
+        request.addfinalizer(harness.cleanup)
+        harness.add_resource("ams-snap", "ams.snap")
+        harness.set_leader(True)
+        harness.update_config(
+            {
+                "use_embedded_etcd": True,
+                "config": "images.url=https://dummy.image.io\nimages.auth=custom:auth",
+            }
+        )
+        harness.begin()
+        harness.charm.on.config_changed.emit()
+        harness.charm._snap.apply_service_configuration.assert_called_once()
+        assert len(harness.charm._snap.apply_service_configuration.call_args.args[0]) == 2
+
+
+def test_can_set_location_in_ams(request):
+    with patch("src.charm.AMS"):
+        charm_cls = AmsOperatorCharm
+        charm_cls.private_ip = "10.0.0.1"
+        harness = Harness(charm_cls)
+        request.addfinalizer(harness.cleanup)
+        harness.add_resource("ams-snap", "ams.snap")
+        harness.set_leader(True)
+        harness.update_config(
+            {"use_embedded_etcd": True, "location": "https://custom-endpoint.com"}
+        )
+        harness.begin()
+        harness.charm.on.config_changed.emit()
+        harness.charm._snap.set_location.assert_called_once()

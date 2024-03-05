@@ -21,26 +21,30 @@ from pathlib import Path
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME: str = METADATA["name"]
-ETCD_CHARM_NAME = 'etcd'
-TLS_CHARM_NAME = 'easyrsa'
-APP_NAMES=[APP_NAME, ETCD_CHARM_NAME, TLS_CHARM_NAME]
+ETCD_CHARM_NAME = "etcd"
+TLS_CHARM_NAME = "easyrsa"
+APP_NAMES = [APP_NAME, ETCD_CHARM_NAME, TLS_CHARM_NAME]
+
 
 @pytest.fixture
 def constraints(request) -> dict:
-    constraints =  request.config.getoption("--constraints")
+    constraints = request.config.getoption("--constraints")
     cts = {}
     for constraint in constraints.split(" "):
         k, v = constraint.split("=")
         cts[k] = v
     return cts
 
+
 @pytest.fixture
 def ams_snap(request):
     return request.config.getoption("--ams-snap")
+
 
 @pytest.mark.abort_on_fail
 async def test_can_relate_to_etcd(ops_test: OpsTest, ams_snap, constraints):
@@ -53,13 +57,10 @@ async def test_can_relate_to_etcd(ops_test: OpsTest, ams_snap, constraints):
     if constraints:
         await ops_test.model.set_constraints(constraints)
     ams = await ops_test.model.deploy(
-        charm,
-        application_name=APP_NAME,
-        num_units=1,
-        resources={'ams-snap': 'ams.snap'}
+        charm, application_name=APP_NAME, num_units=1, resources={"ams-snap": "ams.snap"}
     )
-    with open(ams_snap, 'rb') as res:
-        ams.attach_resource('ams-snap', 'ams.snap', res)
+    with open(ams_snap, "rb") as res:
+        ams.attach_resource("ams-snap", "ams.snap", res)
     await asyncio.gather(
         ops_test.model.deploy(
             ETCD_CHARM_NAME,
@@ -78,6 +79,3 @@ async def test_can_relate_to_etcd(ops_test: OpsTest, ams_snap, constraints):
     await ops_test.model.relate(f"{TLS_CHARM_NAME}:client", f"{ETCD_CHARM_NAME}:certificates")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=1000)
-
-
-

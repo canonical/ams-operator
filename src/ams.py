@@ -22,7 +22,7 @@ import subprocess
 import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 import ops
 import yaml
@@ -287,3 +287,9 @@ class AMS:
         """Remove client from AMS."""
         subprocess.run(["/snap/bin/amc", "config", "trust", "remove", fingerprint], check=True)
         logger.info("Client unregistered successfully. Certificate removed")
+
+    def apply_service_configuration(self, config_items: List[str]):
+        """Set configuration items in ams using `amc config set`."""
+        for item in config_items:
+            name, value = item.split("=")
+            self._set_config_item(name, value)

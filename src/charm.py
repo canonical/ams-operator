@@ -41,7 +41,7 @@ from ops.charm import (
 )
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus, ModelError
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -146,6 +146,8 @@ class AmsOperatorCharm(CharmBase):
         self._snap.configure(cfg)
         if self.config["location"]:
             self._snap.set_location(self.config["location"], self.config["port"])
+        if self.config["config"]:
+            self._snap.apply_service_configuration(self.config["config"].split("\n"))
         self.unit.set_ports(int(self.config["port"]))
         self.unit.status = ActiveStatus()
 
@@ -203,7 +205,9 @@ class AmsOperatorCharm(CharmBase):
         self._snap.unregister_client(fp)
 
     @staticmethod
-    def _generate_selfsigned_cert(hostname, public_ip, private_ip) -> Tuple[bytes, bytes]:
+    def _generate_selfsigned_cert(
+        hostname, public_ip, private_ip
+    ) -> Tuple[bytes, bytes]:  # noqa: F821
         if not hostname:
             raise Exception("A hostname is required")
 
