@@ -104,8 +104,8 @@ def test_can_apply_config_items_to_ams(request):
         )
         harness.begin()
         harness.charm.on.config_changed.emit()
-        harness.charm._snap.apply_service_configuration.assert_called_once()
-        assert len(harness.charm._snap.apply_service_configuration.call_args.args[0]) == 2
+        harness.charm.ams.apply_service_configuration.assert_called_once()
+        assert len(harness.charm.ams.apply_service_configuration.call_args.args[0]) == 2
 
 
 def test_can_set_location_in_ams(request):
@@ -121,4 +121,4 @@ def test_can_set_location_in_ams(request):
         )
         harness.begin()
         harness.charm.on.config_changed.emit()
-        harness.charm._snap.set_location.assert_called_once()
+        harness.charm.ams.set_location.assert_called_once()

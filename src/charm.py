@@ -58,7 +58,7 @@ class AmsOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self._snap = AMS(self)
+        self.ams = AMS(self)
         self._state.set_default(registered_clients=set())
         self.etcd = ETCDEndpointConsumer(self, "etcd")
         self.framework.observe(self.on.install, self._on_install)
@@ -86,20 +86,20 @@ class AmsOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("Waiting for Ubuntu Pro attachment")
             return
         try:
-            self._snap.install()
+            self.ams.install()
         except Exception:
             event.defer()
             return
-        self.unit.set_workload_version(self._snap.version)
+        self.unit.set_workload_version(self.ams.version)
 
     def _on_upgrade(self, _: UpgradeCharmEvent):
         # TODO: remove this when the snaps are available from the snap store
         # upgrading does not make sense right now as the snaps have been
         # installed from a local resource.
-        self._snap.install()
+        self.ams.install()
 
     def _on_stop(self, _: StopEvent):
-        self._snap.remove()
+        self.ams.remove()
 
     def _on_config_changed(self, event: ConfigChangedEvent):
         self.unit.status = WaitingStatus("Configuring AMS")
@@ -143,24 +143,24 @@ class AmsOperatorCharm(CharmBase):
             backend=backend_cfg,
             store=etcd_cfg,
         )
-        self._snap.configure(cfg)
+        self.ams.configure(cfg)
         if self.config["location"]:
-            self._snap.set_location(self.config["location"], self.config["port"])
+            self.ams.set_location(self.config["location"], self.config["port"])
         if self.config["config"]:
-            self._snap.apply_service_configuration(self.config["config"].split("\n"))
+            self.ams.apply_service_configuration(self.config["config"].split("\n"))
         self.unit.set_ports(int(self.config["port"]))
         self.unit.status = ActiveStatus()
 
     def _on_etcd_available(self, _):
         cfg = self.etcd.get_config()
-        self._snap.setup_etcd(ca=cfg["ca"], cert=cfg["cert"], key=cfg["key"])
+        self.ams.setup_etcd(ca=cfg["ca"], cert=cfg["cert"], key=cfg["key"])
         self.on.config_changed.emit()
 
     def _on_lxd_integrator_joined(self, event: RelationJoinedEvent):
         cert, key = AmsOperatorCharm._generate_selfsigned_cert(
             self.public_ip, self.public_ip, self.private_ip
         )
-        self._snap.setup_lxd(cert=cert, key=key)
+        self.ams.setup_lxd(cert=cert, key=key)
         relation_data = event.relation.data[self.unit]
         relation_data["client_certificates"] = json.dumps([cert.decode("utf-8")])
 
@@ -174,10 +174,10 @@ class AmsOperatorCharm(CharmBase):
             event.defer()
             logger.error("No client certificate found")
             return
-        if not self._snap.is_running:
+        if not self.ams.is_running:
             event.defer()
             return
-        fingerprint = self._snap.register_client(ast.literal_eval(client_cert))
+        fingerprint = self.ams.register_client(ast.literal_eval(client_cert))
         if fingerprint:
             self._state.registered_clients.add(f"{event.unit.name}:{fingerprint}")
         logger.info("Client registration with AMS complete")
@@ -187,7 +187,7 @@ class AmsOperatorCharm(CharmBase):
             "public_address": self.public_ip,
             "node": self.unit.name.replace("/", ""),
         }
-        location = self._snap.get_config_item("load_balancer.url")
+        location = self.ams.get_config_item("load_balancer.url")
         if location:
             data["private_address"] = location
         event.relation.data[self.unit].update(data)
@@ -202,7 +202,7 @@ class AmsOperatorCharm(CharmBase):
         if not fp:
             logger.warning(f"No client found for {event.unit} to unregister")
             return
-        self._snap.unregister_client(fp)
+        self.ams.unregister_client(fp)
 
     @staticmethod
     def _generate_selfsigned_cert(
