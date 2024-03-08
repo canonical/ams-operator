@@ -57,7 +57,6 @@ jobs:
       - name: Run integration tests
         env:
             snap_channel: 1.21/stable
-            UBUNTU_STORE_AUTH: {{ secrets.SNAPSTORE_TOKEN }}
         run: |
           mkdir -p snaps/
           snap download --basename=ams --channel={{ env.snap_channel }} --target-directory=./snaps/ ams
