@@ -58,6 +58,5 @@ jobs:
         env:
             snap_channel: 1.21/stable
         run: |
-          mkdir -p snaps/
-          snap download --basename=ams --channel={{ env.snap_channel }} --target-directory=./snaps/ ams
+          snap download --basename=ams --channel=${{ env.snap_channel }} --target-directory=./snaps/ ams
           tox -e integration-${{ env.libjuju }} -- --ams-snap ./snaps/ams.snap

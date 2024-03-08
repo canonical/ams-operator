@@ -36,6 +36,8 @@ def constraints(request) -> dict:
     constraints = request.config.getoption("--constraints")
     cts = {}
     for constraint in constraints.split(" "):
+        if not constraint:
+            continue
         k, v = constraint.split("=")
         cts[k] = v
     return cts
