@@ -22,7 +22,7 @@ import subprocess
 import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Dict, List, Optional
 
 import ops
 import yaml
@@ -61,7 +61,7 @@ class ETCDConfig:
     ca: Path = ETCD_CA_PATH
     cert: Path = ETCD_CERT_PATH
     key: Path = ETCD_KEY_PATH
-    servers: list[str] = field(default_factory=list)
+    servers: List[str] = field(default_factory=list)
 
     @property
     def is_ready(self) -> bool:
@@ -82,7 +82,7 @@ class PrometheusConfig:
     basic_auth_username: str
     basic_auth_password: str
     metrics_path: str
-    extra_labels: Optional[dict[str, str]] = field(default_factory=dict)
+    extra_labels: Optional[Dict[str, str]] = field(default_factory=dict)
     enabled: bool = False
 
     def __post_init__(self):
@@ -135,17 +135,16 @@ class AMS:
         """Install AMS including its Snap."""
         try:
             res = self._charm.model.resources.fetch("ams-snap")
+            # FIXME: Install the ams snap from a resource until we make the
+            # snaps in the snap store unlisted
+            if res is not None and res.stat().st_size:
+                snap.install_local(res, classic=False, dangerous=True)
+                logger.info("Installed AMS snap from local snap resource")
+            else:
+                raise Exception("Invalid format for `ams-snap` resource")
         except ops.ModelError:
-            res = None
-
-        # FIXME: Install the ams snap from a resource until we make the
-        # snaps in the snap store unlisted
-        if res is not None and res.stat().st_size:
-            snap.install_local(res, classic=False, dangerous=True)
-            logger.info("Installed AMS snap from local snap resource")
-        else:
             self._charm.unit.status = BlockedStatus("Waiting for AMS snap resource")
-            return
+            raise
 
         # refresh snap cache after installation
         self._sc._load_installed_snaps()
@@ -184,7 +183,7 @@ class AMS:
 
     # TODO: remove this function to get snap from SnapCache()['ams'] after the
     # snap is made publicly available in the snap store
-    def _get_snap(self) -> dict | None:
+    def _get_snap(self) -> dict:
         snaps = self._sc._snap_client.get_installed_snaps()
         for installed_snap in snaps:
             if installed_snap["name"] == SNAP_NAME:
@@ -248,7 +247,7 @@ class AMS:
     def _set_config_item(self, name, value):
         subprocess.run(["/snap/bin/amc", "config", "set", name, value], check=True)
 
-    def get_registered_certificates(self) -> list[dict[str, str]]:
+    def get_registered_certificates(self) -> List[Dict[str, str]]:
         """Get registered client with AMS."""
         result = subprocess.run(
             ["/snap/bin/amc", "config", "trust", "ls", "--format", "json"], capture_output=True
@@ -288,3 +287,9 @@ class AMS:
         """Remove client from AMS."""
         subprocess.run(["/snap/bin/amc", "config", "trust", "remove", fingerprint], check=True)
         logger.info("Client unregistered successfully. Certificate removed")
+
+    def apply_service_configuration(self, config_items: List[str]):
+        """Set configuration items in ams using `amc config set`."""
+        for item in config_items:
+            name, value = item.split("=")
+            self._set_config_item(name, value)

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 #  Copyright 2024 Canonical Ltd.
@@ -15,6 +14,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import asyncio
 import logging
 
 import pytest
@@ -22,10 +22,12 @@ from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
+TEST_APP_CHARM_PATH = "tests/integration/application-charm"
+TEST_APP_CHARM_NAME = 'ams-api-tester'
 
 @pytest.mark.abort_on_fail
-async def test_can_deploy_with_embedded_etcd(
-    ops_test: OpsTest, ams_snap, constraints, charm_name, charm_path
+async def test_can_relate_to_client_charms(
+    ops_test: OpsTest, ams_snap, charm_name, constraints, charm_path
 ):
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -36,16 +38,22 @@ async def test_can_deploy_with_embedded_etcd(
         charm_path = await ops_test.build_charm(".")
     if constraints:
         await ops_test.model.set_constraints(constraints)
+    client_charm_path = await ops_test.build_charm(TEST_APP_CHARM_PATH)
     ams = await ops_test.model.deploy(
-        charm_path,
-        application_name=charm_name,
-        resources={"ams-snap": "ams.snap"},
-        config={"use_embedded_etcd": True}
+            charm_path, application_name=charm_name, num_units=1, resources={"ams-snap": "ams.snap"}, config={'use_embedded_etcd': True}
     )
     with open(ams_snap, "rb") as res:
         ams.attach_resource("ams-snap", "ams.snap", res)
+    await asyncio.gather(
+        ops_test.model.deploy(
+            client_charm_path,
+            application_name=TEST_APP_CHARM_NAME,
+            channel="latest/stable",
+            num_units=1,
+        ),
+    )
+    await ops_test.model.relate(f"{TEST_APP_CHARM_NAME}:client", f"{charm_name}:rest-api")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
-            apps=[charm_name], status="active", timeout=1000
+            apps=[TEST_APP_CHARM_NAME, charm_name], status="active", timeout=1000
         )
-

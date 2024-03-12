@@ -1,14 +1,5 @@
-# This file configures Charmcraft.
-# See https://juju.is/docs/sdk/charmcraft-config for guidance.
-
 type: charm
 bases:
-- build-on:
-  - name: "ubuntu"
-    channel: "20.04"
-  run-on:
-  - name: "ubuntu"
-    channel: "20.04"
 - build-on:
   - name: "ubuntu"
     channel: "22.04"
@@ -20,8 +11,8 @@ parts:
     charm-requirements: ["requirements.txt"]
     build-packages:
     - git
-    - libffi-dev
     - libssl-dev
+    - libffi-dev
     - rustc
     - cargo
     - pkg-config

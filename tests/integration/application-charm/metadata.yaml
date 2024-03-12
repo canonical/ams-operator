@@ -1,0 +1,11 @@
+name: ams-api-tester
+display-name: ams-client-app
+description: a testing application for ams charm
+summary: A simple application to relate to the rest interface to test the ams charm
+subordinate: false
+series:
+    - jammy
+requires:
+    client:
+        interface: rest
+

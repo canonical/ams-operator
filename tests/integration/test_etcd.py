@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 #  Copyright 2024 Canonical Ltd.
@@ -15,6 +14,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import asyncio
 import logging
 
 import pytest
@@ -22,10 +22,14 @@ from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
+ETCD_CHARM_NAME = "etcd"
+TLS_CHARM_NAME = "easyrsa"
+APP_NAMES = [ETCD_CHARM_NAME, TLS_CHARM_NAME]
+
 
 @pytest.mark.abort_on_fail
-async def test_can_deploy_with_embedded_etcd(
-    ops_test: OpsTest, ams_snap, constraints, charm_name, charm_path
+async def test_can_relate_to_etcd(
+    ops_test: OpsTest, ams_snap, charm_name, constraints, charm_path
 ):
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -37,15 +41,27 @@ async def test_can_deploy_with_embedded_etcd(
     if constraints:
         await ops_test.model.set_constraints(constraints)
     ams = await ops_test.model.deploy(
-        charm_path,
-        application_name=charm_name,
-        resources={"ams-snap": "ams.snap"},
-        config={"use_embedded_etcd": True}
+        charm_path, application_name=charm_name, num_units=1, resources={"ams-snap": "ams.snap"}
     )
     with open(ams_snap, "rb") as res:
         ams.attach_resource("ams-snap", "ams.snap", res)
+    await asyncio.gather(
+        ops_test.model.deploy(
+            ETCD_CHARM_NAME,
+            application_name=ETCD_CHARM_NAME,
+            channel="latest/stable",
+            num_units=1,
+        ),
+        ops_test.model.deploy(
+            TLS_CHARM_NAME,
+            application_name=TLS_CHARM_NAME,
+            channel="latest/stable",
+            num_units=1,
+        ),
+    )
+    await ops_test.model.relate(f"{ETCD_CHARM_NAME}:db", f"{charm_name}:etcd")
+    await ops_test.model.relate(f"{TLS_CHARM_NAME}:client", f"{ETCD_CHARM_NAME}:certificates")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
-            apps=[charm_name], status="active", timeout=1000
+            apps=[*APP_NAMES, charm_name], status="active", timeout=1000
         )
-
