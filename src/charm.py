@@ -21,8 +21,10 @@ from __future__ import annotations
 import ast
 import json
 import logging
+from typing import Dict, List
 
 from ams import AMS, SNAP_DEFAULT_RISK, BackendConfig, ETCDConfig, PrometheusConfig, ServiceConfig
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.tls_certificates_interface.v3.tls_certificates import (
     generate_ca,
     generate_certificate,
@@ -70,6 +72,22 @@ class AmsOperatorCharm(CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.etcd.on.available, self._on_etcd_available)
+        self.metrics_cfg = PrometheusConfig(
+            target_ip=self.private_ip,
+            target_port=int(self.config["prometheus_target_port"]),
+            tls_cert_path=self.config["prometheus_tls_cert_path"],
+            tls_key_path=self.config["prometheus_tls_key_path"],
+            basic_auth_username=self.config["prometheus_basic_auth_username"],
+            basic_auth_password=self.config["prometheus_basic_auth_password"],
+            extra_labels=self.config["prometheus_extra_labels"],
+            metrics_path=self.config["prometheus_metrics_path"],
+        )
+        self._cos = COSAgentProvider(
+            self,
+            relation_name="cos-agent",
+            refresh_events=[self.on.update_status, self.on.upgrade_charm, self.on.config_changed],
+            scrape_configs=self.generate_scrape_config,
+        )
         self.framework.observe(
             self.on["lxd-cluster"].relation_joined, self._on_lxd_integrator_joined
         )
@@ -85,6 +103,13 @@ class AmsOperatorCharm(CharmBase):
     def private_ip(self) -> str:
         """Private address of the unit."""
         return self.model.get_binding("juju-info").network.bind_address.exploded
+
+    def generate_scrape_config(self) -> List[Dict]:
+        """Generate dynamic configs for sending metrics to prometheus."""
+        if not (self.metrics_cfg and self.metrics_cfg.enabled):
+            return []
+        logger.debug("Generated prometheus config: %s", self.metrics_cfg.scrape_jobs)
+        return self.metrics_cfg.scrape_jobs
 
     def _on_install(self, event: InstallEvent):
         if not _is_pro_attached():
@@ -128,21 +153,11 @@ class AmsOperatorCharm(CharmBase):
         if self.config["metrics_server"]:
             backend_cfg.metrics_server = f"influxdb:{self.config['metrics_server']}"
 
-        metrics_cfg = PrometheusConfig(
-            ip=self.private_ip,
-            port=int(self.config["prometheus_target_port"]),
-            tls_cert_path=self.config["prometheus_tls_cert_path"],
-            tls_key_path=self.config["prometheus_tls_key_path"],
-            basic_auth_username=self.config["prometheus_basic_auth_username"],
-            basic_auth_password=self.config["prometheus_basic_auth_password"],
-            extra_labels=self.config["prometheus_extra_labels"],
-            metrics_path=self.config["prometheus_metrics_path"],
-        )
         cfg = ServiceConfig(
             ip=self.private_ip,
             port=int(self.config["port"]),
             log_level=self.config["log_level"],
-            metrics=metrics_cfg,
+            metrics=self.metrics_cfg,
             backend=backend_cfg,
             store=etcd_cfg,
         )

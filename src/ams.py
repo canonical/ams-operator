@@ -75,8 +75,8 @@ class ETCDConfig:
 class PrometheusConfig:
     """Metrics configuration for AMS."""
 
-    ip: str
-    port: int
+    target_ip: str
+    target_port: int
     tls_cert_path: str
     tls_key_path: str
     basic_auth_username: str
@@ -87,8 +87,24 @@ class PrometheusConfig:
 
     def __post_init__(self):
         """Post initialization validations."""
-        if self.port > 0:
+        if self.target_port > 0:
             self.enabled = True
+
+    @property
+    def scrape_jobs(self) -> List[Dict]:
+        """Generate scrape jobs for prometheus."""
+        job = {
+            "job_name": "metrics",
+            "metrics_path": self.metrics_path,
+            "static_configs": [{"targets": [f"{self.target_ip}:{self.target_port}"]}],
+        }
+        if self.basic_auth_password and self.basic_auth_password:
+            auth = {"username": self.basic_auth_username, "password": self.basic_auth_password}
+            job.update(basic_auth=auth)
+        if self.tls_key_path and self.tls_cert_path:
+            tls_cfg = {"cert_file": self.tls_cert_path, "key_file": self.tls_key_path}
+            job.update(tls_config=tls_cfg)
+        return [job]
 
 
 @dataclass
@@ -202,6 +218,7 @@ class AMS:
         rendered_content = template.render(content)
         AMS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         AMS_CONFIG_PATH.write_text(rendered_content)
+        logger.debug("Configuration written for ams: %s", rendered_content)
 
         self.snap.start(enable=True)
 
@@ -230,6 +247,7 @@ class AMS:
 
     def _set_config_item(self, name, value):
         subprocess.run(["/snap/bin/amc", "config", "set", name, value], check=True)
+        logger.info("Set ams configuration item: %s=%s", name, value)
 
     def get_registered_certificates(self) -> List[Dict[str, str]]:
         """Get registered client with AMS."""
@@ -257,7 +275,7 @@ class AMS:
                 return ""
             else:
                 result.check_returncode()
-                logger.info("Registered new client")
+                logger.debug("Registered new ams client via amc")
         updated_certs = self.get_registered_certificates()
         updated_fp = set()
         for crt in updated_certs:
