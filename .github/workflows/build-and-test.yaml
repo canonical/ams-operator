@@ -26,11 +26,17 @@ jobs:
       - name: Run tests
         run: tox -e unit
 
+  build:
+    name: Build charm
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v13.0.0
+    with:
+      cache: true
+
   integration-test:
     name: Integration tests
-    runs-on: [self-hosted, linux, X64, jammy, large]
     needs:
       - lint
+      - build
       - unit-test
     strategy:
       fail-fast: false
@@ -39,6 +45,10 @@ jobs:
         agent-versions:
           - "3.2.2"  # renovate: latest juju 3
           - "2.9.44"  # renovate: latest juju 2
+        platform:
+          - [self-hosted, linux, X64, jammy, large]
+          - [Ubuntu_ARM64_4C_16G_01]
+    runs-on: "${{matrix.platform}}"
     steps:
       - name: Checkout
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
@@ -54,8 +64,14 @@ jobs:
           provider: lxd
           juju-channel: "${{ env.channel }}"
           bootstrap-options: "--agent-version ${{ matrix.agent-versions }}"
+      - name: Download packed charm(s)
+        uses: actions/download-artifact@v4
+        id: downloaded-charm
+        with:
+          pattern: ${{ inputs.artifact-prefix }}-*
+          merge-multiple: true
       - name: Run integration tests
         env:
             snap_channel: 1.21/stable
         run: |
-          tox -e integration-${{ env.libjuju }}
+          tox -e integration-${{ env.libjuju }} -- --charm=${{ steps.downloaded-charm.outputs.download-path }}
