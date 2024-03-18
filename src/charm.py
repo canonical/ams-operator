@@ -22,7 +22,7 @@ import ast
 import json
 import logging
 
-from ams import AMS, BackendConfig, ETCDConfig, PrometheusConfig, ServiceConfig
+from ams import AMS, SNAP_DEFAULT_RISK, BackendConfig, ETCDConfig, PrometheusConfig, ServiceConfig
 from charms.tls_certificates_interface.v3.tls_certificates import (
     generate_ca,
     generate_certificate,
@@ -49,6 +49,10 @@ logger = logging.getLogger(__name__)
 
 def _is_pro_attached():
     return True
+
+
+with open("version", "r") as f:
+    CHARM_VERSION = f.read().strip("\n")
 
 
 class AmsOperatorCharm(CharmBase):
@@ -86,18 +90,16 @@ class AmsOperatorCharm(CharmBase):
         if not _is_pro_attached():
             self.unit.status = BlockedStatus("Waiting for Ubuntu Pro attachment")
             return
-        try:
-            self.ams.install()
-        except Exception:
-            event.defer()
-            return
+        snap_risk_level = self.config.get("snap_risk_level", SNAP_DEFAULT_RISK)
+        revision = self.config.get("snap_revision", "")
+        self.ams.install(channel=f"{CHARM_VERSION}/{snap_risk_level}", revision=revision)
         self.unit.set_workload_version(self.ams.version)
 
     def _on_upgrade(self, _: UpgradeCharmEvent):
-        # TODO: remove this when the snaps are available from the snap store
-        # upgrading does not make sense right now as the snaps have been
-        # installed from a local resource.
-        self.ams.install()
+        snap_risk_level = self.config.get("snap_risk_level", SNAP_DEFAULT_RISK)
+        revision = self.config.get("snap_revision", "")
+        self.ams.install(f"{CHARM_VERSION}/{snap_risk_level}", revision=revision)
+        self.unit.set_workload_version(self.ams.version)
 
     def _on_stop(self, _: StopEvent):
         self.ams.remove()

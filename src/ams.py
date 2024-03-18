@@ -30,10 +30,10 @@ from charms.operator_libs_linux.v0 import passwd
 from charms.operator_libs_linux.v1 import systemd
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Environment, FileSystemLoader
-from ops.model import BlockedStatus
 
 SNAP_NAME = "ams"
 SNAP_COMMON_PATH = Path(f"/var/snap/{SNAP_NAME}/common")
+SNAP_DEFAULT_RISK = "stable"
 
 ETCD_BASE_PATH = SNAP_COMMON_PATH / "etcd"
 ETCD_CA_PATH = ETCD_BASE_PATH / "client-ca.pem"
@@ -121,36 +121,40 @@ class AMS:
         self._sc = snap.SnapCache()
         self._charm = charm
 
+    @property
+    def snap(self):
+        """Return AMS snap."""
+        return self._sc[SNAP_NAME]
+
     def restart(self):
         """Restart AMS Snap."""
-        self._sc["ams"].restart()
+        self.snap.restart()
 
     def remove(self):
         """Remove AMS users, drop-in service and the snap."""
-        self._sc["ams"].remove()
+        snap.remove(SNAP_NAME)
         shutil.rmtree(SERVICE_DROP_IN_PATH.parent)
         passwd.remove_group(GROUP_NAME)
 
-    def install(self):
+    def install(self, channel: str, revision: Optional[str] = None):
         """Install AMS including its Snap."""
         try:
-            res = self._charm.model.resources.fetch("ams-snap")
-            # FIXME: Install the ams snap from a resource until we make the
-            # snaps in the snap store unlisted
-            if res is not None and res.stat().st_size:
-                snap.install_local(res, classic=False, dangerous=True)
-                logger.info("Installed AMS snap from local snap resource")
+            kwargs = {}
+            if revision:
+                kwargs = {"revision": int(revision)}
             else:
-                raise Exception("Invalid format for `ams-snap` resource")
-        except ops.ModelError:
-            self._charm.unit.status = BlockedStatus("Waiting for AMS snap resource")
-            raise
+                kwargs = {"channel": channel}
+            self.snap.ensure(state=snap.SnapState.Latest, **kwargs)
+            self.snap.hold()
+        except snap.SnapError as e:
+            logger.error("could not install ams. Reason: %s", e.message)
+            logger.debug(e, exc_info=True)
+            raise e
 
         # refresh snap cache after installation
         self._sc._load_installed_snaps()
-        ams_snap = self._sc["ams"]
-        ams_snap.connect(plug="daemon-notify", slot="core:daemon-notify")
-        ams_snap.alias("amc", "amc")
+        self.snap.connect(plug="daemon-notify", slot="core:daemon-notify")
+        self.snap.alias("amc", "amc")
 
         passwd.add_group(GROUP_NAME)
         passwd.add_user_to_group("ubuntu", GROUP_NAME)
@@ -181,30 +185,11 @@ class AMS:
         SERVICE_DROP_IN_PATH.write_text(rendered_content)
         systemd.daemon_reload()
 
-    # TODO: remove this function to get snap from SnapCache()['ams'] after the
-    # snap is made publicly available in the snap store
-    def _get_snap(self) -> dict:
-        snaps = self._sc._snap_client.get_installed_snaps()
-        for installed_snap in snaps:
-            if installed_snap["name"] == SNAP_NAME:
-                return installed_snap
-        return None
-
     @property
     def version(self) -> str:
         """Return AMS version."""
-        _snap = self._get_snap()
-        if not _snap:
-            raise snap.SnapNotFoundError(SNAP_NAME)
-        return _snap["version"]
-
-    @property
-    def installed(self) -> bool:
-        """Check if AMS is installed."""
-        _snap = self._get_snap()
-        if not _snap:
-            return False
-        return True
+        snap_info = self.snap._snap_client.get_snap_information(SNAP_NAME)
+        return snap_info["channels"][self.snap.channel]["version"]
 
     def configure(
         self,
@@ -214,12 +199,11 @@ class AMS:
         tenv = Environment(loader=FileSystemLoader("templates"))
         template = tenv.get_template("settings.yaml.j2")
         content = asdict(config)
-        logger.info(content)
         rendered_content = template.render(content)
         AMS_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
         AMS_CONFIG_PATH.write_text(rendered_content)
 
-        self._sc["ams"].start(enable=True)
+        self.snap.start(enable=True)
 
     @property
     def is_running(self):

@@ -28,9 +28,7 @@ APP_NAMES = [ETCD_CHARM_NAME, TLS_CHARM_NAME]
 
 
 @pytest.mark.abort_on_fail
-async def test_can_relate_to_etcd(
-    ops_test: OpsTest, ams_snap, charm_name, constraints, charm_path
-):
+async def test_can_relate_to_etcd(ops_test: OpsTest, charm_name, constraints, charm_path):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -40,12 +38,8 @@ async def test_can_relate_to_etcd(
         charm_path = await ops_test.build_charm(".")
     if constraints:
         await ops_test.model.set_constraints(constraints)
-    ams = await ops_test.model.deploy(
-        charm_path, application_name=charm_name, num_units=1, resources={"ams-snap": "ams.snap"}
-    )
-    with open(ams_snap, "rb") as res:
-        ams.attach_resource("ams-snap", "ams.snap", res)
     await asyncio.gather(
+        ops_test.model.deploy(charm_path, application_name=charm_name, num_units=1),
         ops_test.model.deploy(
             ETCD_CHARM_NAME,
             application_name=ETCD_CHARM_NAME,
@@ -59,8 +53,11 @@ async def test_can_relate_to_etcd(
             num_units=1,
         ),
     )
-    await ops_test.model.relate(f"{ETCD_CHARM_NAME}:db", f"{charm_name}:etcd")
-    await ops_test.model.relate(f"{TLS_CHARM_NAME}:client", f"{ETCD_CHARM_NAME}:certificates")
+
+    await asyncio.gather(
+        ops_test.model.relate(f"{ETCD_CHARM_NAME}:db", f"{charm_name}:etcd"),
+        ops_test.model.relate(f"{TLS_CHARM_NAME}:client", f"{ETCD_CHARM_NAME}:certificates"),
+    )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
             apps=[*APP_NAMES, charm_name], status="active", timeout=1000

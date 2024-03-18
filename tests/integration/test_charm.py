@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.mark.abort_on_fail
 async def test_can_deploy_with_embedded_etcd(
-    ops_test: OpsTest, ams_snap, constraints, charm_name, charm_path
+    ops_test: OpsTest, constraints, charm_name, charm_path
 ):
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -36,16 +36,10 @@ async def test_can_deploy_with_embedded_etcd(
         charm_path = await ops_test.build_charm(".")
     if constraints:
         await ops_test.model.set_constraints(constraints)
-    ams = await ops_test.model.deploy(
+    await ops_test.model.deploy(
         charm_path,
         application_name=charm_name,
-        resources={"ams-snap": "ams.snap"},
-        config={"use_embedded_etcd": True}
+        config={"use_embedded_etcd": True},
     )
-    with open(ams_snap, "rb") as res:
-        ams.attach_resource("ams-snap", "ams.snap", res)
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            apps=[charm_name], status="active", timeout=1000
-        )
-
+        await ops_test.model.wait_for_idle(apps=[charm_name], status="active", timeout=1000)

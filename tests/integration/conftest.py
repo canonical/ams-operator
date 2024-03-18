@@ -20,7 +20,6 @@ import yaml
 
 
 def pytest_addoption(parser):
-    parser.addoption("--ams-snap", required=True, action="store", help="Snap resource for ams")
     parser.addoption("--constraints", default="", action="store", help="Model constraints")
     parser.addoption("--charm", default="", action="store", help="Path to a built charm")
 
@@ -41,11 +40,6 @@ def constraints(request) -> dict:
         k, v = constraint.split("=")
         cts[k] = v
     return cts
-
-
-@pytest.fixture
-def ams_snap(request):
-    return request.config.getoption("--ams-snap")
 
 
 @pytest.fixture
