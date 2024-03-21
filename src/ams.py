@@ -98,12 +98,9 @@ class PrometheusConfig:
             "metrics_path": self.metrics_path,
             "static_configs": [{"targets": [f"{self.target_ip}:{self.target_port}"]}],
         }
-        if self.basic_auth_password and self.basic_auth_password:
+        if self.basic_auth_username and self.basic_auth_password:
             auth = {"username": self.basic_auth_username, "password": self.basic_auth_password}
             job.update(basic_auth=auth)
-        if self.tls_key_path and self.tls_cert_path:
-            tls_cfg = {"cert_file": self.tls_cert_path, "key_file": self.tls_key_path}
-            job.update(tls_config=tls_cfg)
         return [job]
 
 
@@ -247,7 +244,7 @@ class AMS:
 
     def _set_config_item(self, name, value):
         subprocess.run(["/snap/bin/amc", "config", "set", name, value], check=True)
-        logger.info("Set ams configuration item: %s=%s", name, value)
+        logger.debug("Set ams configuration item: %s", name)
 
     def get_registered_certificates(self) -> List[Dict[str, str]]:
         """Get registered client with AMS."""
