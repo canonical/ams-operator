@@ -50,18 +50,17 @@ class ApplicationCharm(ops.CharmBase):
         )
         relation_data = event.relation.data[self.unit]
         relation_data["client_certificate"] = json.dumps(self._state.cert.decode("utf-8"))
-        with open('client.key', 'w') as key, open('client.cert', 'w') as cert:
+        with open("client.key", "w") as key, open("client.cert", "w") as cert:
             cert.write(self._state.cert.decode())
             key.write(self._state.key.decode())
 
-
     def _on_client_relation_changed(self, event):
         data = event.relation.data[event.unit]
-        if not ('public_address' in data or 'port' in data):
+        if not ("public_address" in data or "port" in data):
             event.defer()
             return
         test_url = f"https://{data['public_address']}:{data['port']}/1.0/instances"
-        resp = requests.get(test_url, verify=False, cert=('client.cert', 'client.key'))
+        resp = requests.get(test_url, verify=False, cert=("client.cert", "client.key"))
         resp.raise_for_status()
         logger.info("Connected to ams successfully with authentication")
 

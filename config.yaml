@@ -4,6 +4,16 @@
 # See https://juju.is/docs/config for guidance.
 
 options:
+  snap_risk_level:
+    type: string
+    default: "stable"
+    description: Risk level to use for the snap version
+  snap_revision:
+    type: string
+    default: ""
+    description: |
+      Specific revision of the snap to install or pin to. This takes precedence
+      over the channel if both are set.
   port:
     type: int
     default: 8444

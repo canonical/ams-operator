@@ -16,6 +16,7 @@
 
 import logging
 
+import asyncio
 import os
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -26,7 +27,7 @@ INTEGRATOR_CHARM_NAME = "lxd-integrator"
 
 
 @pytest.mark.abort_on_fail
-async def test_can_relate_to_lxd(ops_test: OpsTest, ams_snap, constraints, charm_name, charm_path):
+async def test_can_relate_to_lxd(ops_test: OpsTest, constraints, charm_name, charm_path):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -36,30 +37,32 @@ async def test_can_relate_to_lxd(ops_test: OpsTest, ams_snap, constraints, charm
         charm_path = await ops_test.build_charm(".")
     if constraints:
         await ops_test.model.set_constraints(constraints)
-    ams = await ops_test.model.deploy(
-        charm_path,
-        application_name=charm_name,
-        num_units=1,
-        resources={"ams-snap": "ams.snap"},
-        config={"use_embedded_etcd": True},
-    )
-    with open(ams_snap, "rb") as res:
-        ams.attach_resource("ams-snap", "ams.snap", res)
-    deploy_opts = { 'base': 'ubuntu@20.04' }
 
-    if "2.9" in os.environ['LIBJUJU']:
-        deploy_opts.update(series='jammy')
-        deploy_opts.pop('base')
+    # FIXME: lxd-integrator charm currently has an issue with the platform and
+    # series compatibility on different platforms so we modify the deployment to
+    # get around it
+    deploy_opts = {"base": "ubuntu@20.04"}
+    if "2.9" in os.environ["LIBJUJU"]:
+        deploy_opts.update(series="jammy")
+        deploy_opts.pop("base")
 
-    await ops_test.model.deploy(
-        INTEGRATOR_CHARM_NAME,
-        application_name=INTEGRATOR_CHARM_NAME,
-        channel="stable",
-        trust=True,
-        **deploy_opts
+    await asyncio.gather(
+        ops_test.model.deploy(
+            charm_path,
+            application_name=charm_name,
+            num_units=1,
+            config={"use_embedded_etcd": True},
+        ),
+        ops_test.model.deploy(
+            INTEGRATOR_CHARM_NAME,
+            application_name=INTEGRATOR_CHARM_NAME,
+            channel="stable",
+            trust=True,
+            **deploy_opts,
+        ),
     )
-    await ops_test.model.relate(f"{INTEGRATOR_CHARM_NAME}:api", f"{charm_name}:lxd-cluster")
     async with ops_test.fast_forward():
+        await ops_test.model.relate(f"{INTEGRATOR_CHARM_NAME}:api", f"{charm_name}:lxd-cluster"),
         await ops_test.model.wait_for_idle(
             apps=[charm_name, INTEGRATOR_CHARM_NAME], status="active", timeout=1000
         )
