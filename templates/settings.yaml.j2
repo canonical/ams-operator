@@ -40,7 +40,7 @@ metrics:
       "{{ key }}": "{{ value }}"
     {%- endfor%}
     {%- endif %}
-    listen-address: {{ metrics.ip }}:{{ metrics.port }}
+    listen-address: {{ metrics.target_ip }}:{{ metrics.target_port }}
     {% if metrics.basic_auth_username|length and metrics.basic_auth_password|length -%}
     username: {{metrics.basic_auth_username}}
     password: {{metrics.basic_auth_password}}

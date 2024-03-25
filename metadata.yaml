@@ -21,6 +21,8 @@ tags:
 provides:
   rest-api:
     interface: rest
+  cos-agent:
+    interface: cos_agent
 requires:
   lxd-cluster:
     interface: lxd
