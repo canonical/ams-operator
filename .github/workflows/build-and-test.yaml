@@ -32,12 +32,29 @@ jobs:
     with:
       cache: true
 
+  collect-tests:
+    name: Collect tests for charms
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+    - name: Assign charm artifacts to runners
+      id: charm-to-runner
+      run: |
+        # Reverse lookup for artifact base index to its architecture
+        ./scripts/ci/get-runners.py
+        cat $GITHUB_OUTPUT
+    outputs:
+      bases: ${{ steps.charm-to-runner.outputs.bases }}
+
   integration-test:
     name: Integration tests
     needs:
       - lint
-      - build
       - unit-test
+      - collect-tests
+      - build
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -45,13 +62,16 @@ jobs:
         agent-versions:
           - "3.2.2"  # renovate: latest juju 3
           - "2.9.44"  # renovate: latest juju 2
-        platform:
-          - [self-hosted, linux, X64, jammy, large]
-          - [Ubuntu_ARM64_4C_16G_01]
-    runs-on: "${{matrix.platform}}"
+        base: ${{ fromJSON(needs.collect-tests.outputs.bases) }}
+    runs-on: "${{matrix.base.runner_labels}}"
     steps:
       - name: Checkout
         uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - name: Download packed charm(s)
+        uses: actions/download-artifact@v4
+        id: downloaded-charm
+        with:
+          name: ${{ needs.build.outputs.artifact-prefix }}-base-${{ matrix.base.base_index }}
       - name: Set channel
         run: |
           juju_channel=$(echo "${{ matrix.agent-versions }}" | cut -c 1-3)
@@ -64,14 +84,13 @@ jobs:
           provider: lxd
           juju-channel: "${{ env.channel }}"
           bootstrap-options: "--agent-version ${{ matrix.agent-versions }}"
-      - name: Download packed charm(s)
-        uses: actions/download-artifact@v4
-        id: downloaded-charm
-        with:
-          pattern: ${{ inputs.artifact-prefix }}-*
-          merge-multiple: true
       - name: Run integration tests
         env:
             snap_channel: 1.21/stable
         run: |
-          tox -e integration-${{ env.libjuju }} -- --charm=${{ steps.downloaded-charm.outputs.download-path }}
+          mv ${{ steps.downloaded-charm.outputs.download-path }}/*.charm ams.charm
+          args="--charm=./ams.charm"
+          if [ "${{ matrix.base.arch }}" == "arm64" ]; then
+            args="${args} --constraints arch=arm64"
+          fi
+          tox -e integration-${{ env.libjuju }} -- ${args}
