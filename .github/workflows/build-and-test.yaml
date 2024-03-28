@@ -1,8 +1,11 @@
-name: Build/Test
+name: Build & Test
 
 on:
   workflow_call:
-
+     outputs:
+      artifact-prefix:
+        description: "The charms build by this workflow"
+        value: ${{ jobs.build.outputs.artifact-prefix }}
 jobs:
   lint:
     name: Lint
