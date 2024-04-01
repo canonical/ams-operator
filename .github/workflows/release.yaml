@@ -1,3 +1,5 @@
+name: Release To Edge
+
 on:
   push:
     branches:
@@ -8,21 +10,31 @@ on:
       - .github/renovate.json5
       - pyproject.toml
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  get-version:
+    uses: ./.github/workflows/get-version.yaml
+
   ci:
     name: Build & Test
     uses: ./.github/workflows/build-and-test.yaml
     secrets: inherit
+    with:
+      snap_risk_level: edge
 
   release:
     name: Release charm
     needs:
       - ci
+      - get-version
     uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v13.0.0
     with:
       # TODO: change this when we actually want to cutover the charm to main
       # channels
-      channel: 1.21-ops/edge
+      channel: ${{ needs.get-version.outputs.version }}-ops/edge
       artifact-prefix: ${{ needs.ci.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}

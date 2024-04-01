@@ -26,8 +26,18 @@ TEST_APP_CHARM_PATH = "tests/integration/application-charm"
 TEST_APP_CHARM_NAME = "ams-api-tester"
 
 
+@pytest.fixture(scope="module")
+def charm_config(snap_risk_level) -> dict:
+    cfg = {"use_embedded_etcd": True}
+    if snap_risk_level:
+        cfg.update(snap_risk_level=snap_risk_level)
+    return cfg
+
+
 @pytest.mark.abort_on_fail
-async def test_can_relate_to_client_charms(ops_test: OpsTest, charm_name, constraints, charm_path):
+async def test_can_relate_to_client_charms(
+    ops_test: OpsTest, charm_name, charm_config, constraints, charm_path
+):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -43,7 +53,7 @@ async def test_can_relate_to_client_charms(ops_test: OpsTest, charm_name, constr
             charm_path,
             application_name=charm_name,
             num_units=1,
-            config={"use_embedded_etcd": True},
+            config=charm_config,
         ),
         ops_test.model.deploy(
             client_charm_path,

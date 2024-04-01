@@ -2,9 +2,17 @@ name: Build & Test
 
 on:
   workflow_call:
-     outputs:
+    inputs:
+      snap_risk_level:
+        type: string
+        description: |
+          The track of the snap to test against. Defaults to the default risk
+          level defined in the charm.
+        default: ""
+        required: false
+    outputs:
       artifact-prefix:
-        description: "The charms build by this workflow"
+        description: "The charms built by this workflow"
         value: ${{ jobs.build.outputs.artifact-prefix }}
 jobs:
   lint:
@@ -45,7 +53,6 @@ jobs:
       run: |
         # Reverse lookup for artifact base index to its architecture
         ./scripts/ci/get-runners.py
-        cat $GITHUB_OUTPUT
     outputs:
       bases: ${{ steps.charm-to-runner.outputs.bases }}
 
@@ -86,12 +93,13 @@ jobs:
           juju-channel: "${{ env.channel }}"
           bootstrap-options: "--agent-version ${{ matrix.agent-versions }}"
       - name: Run integration tests
-        env:
-            snap_channel: 1.21/stable
         run: |
           mv ${{ steps.downloaded-charm.outputs.download-path }}/*.charm ams.charm
           args="--charm=./ams.charm"
           if [ "${{ matrix.base.arch }}" == "arm64" ]; then
             args="${args} --constraints arch=arm64"
+          fi
+          if [ -n "${{ inputs.snap_risk_level }}" ]; then
+            args="${args} --snap-risk-level ${{ inputs.snap_risk_level }}"
           fi
           tox -e integration-${{ env.libjuju }} -- ${args}

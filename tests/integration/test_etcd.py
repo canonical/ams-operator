@@ -27,8 +27,18 @@ TLS_CHARM_NAME = "easyrsa"
 APP_NAMES = [ETCD_CHARM_NAME, TLS_CHARM_NAME]
 
 
+@pytest.fixture(scope="module")
+def charm_config(snap_risk_level) -> dict:
+    cfg = {}
+    if snap_risk_level:
+        cfg.update(snap_risk_level=snap_risk_level)
+    return cfg
+
+
 @pytest.mark.abort_on_fail
-async def test_can_relate_to_etcd(ops_test: OpsTest, charm_name, constraints, charm_path):
+async def test_can_relate_to_etcd(
+    ops_test: OpsTest, charm_name, constraints, charm_config, charm_path
+):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -39,7 +49,9 @@ async def test_can_relate_to_etcd(ops_test: OpsTest, charm_name, constraints, ch
     if constraints:
         await ops_test.model.set_constraints(constraints)
     await asyncio.gather(
-        ops_test.model.deploy(charm_path, application_name=charm_name, num_units=1),
+        ops_test.model.deploy(
+            charm_path, application_name=charm_name, num_units=1, config=charm_config
+        ),
         ops_test.model.deploy(
             ETCD_CHARM_NAME,
             application_name=ETCD_CHARM_NAME,

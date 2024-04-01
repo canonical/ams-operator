@@ -1,0 +1,22 @@
+name: Get current version
+
+on:
+  workflow_call:
+    outputs:
+      charm_version:
+        description: "Get the current version of the charm"
+        value: ${{ jobs.get-charm-version.outputs.version }}
+
+jobs:
+  get-charm-version:
+    runs-on: [self-hosted, linux, X64, jammy, large]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - name: Get charm version
+        id: charm_version
+        run: |
+          echo "version=$(cat version)" >> $GITHUB_OUTPUT
+    outputs:
+      version: ${{ steps.charm_version.outputs.version }}
+
