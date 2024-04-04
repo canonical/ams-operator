@@ -19,3 +19,5 @@ concurrency:
 jobs:
   test:
     uses: ./.github/workflows/build-and-test.yaml
+    with:
+      snap_risk_level: edge

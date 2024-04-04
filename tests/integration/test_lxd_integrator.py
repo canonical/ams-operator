@@ -26,8 +26,18 @@ logger = logging.getLogger(__name__)
 INTEGRATOR_CHARM_NAME = "lxd-integrator"
 
 
+@pytest.fixture(scope="module")
+def charm_config(snap_risk_level) -> dict:
+    cfg = {"use_embedded_etcd": True}
+    if snap_risk_level:
+        cfg.update(snap_risk_level=snap_risk_level)
+    return cfg
+
+
 @pytest.mark.abort_on_fail
-async def test_can_relate_to_lxd(ops_test: OpsTest, constraints, charm_name, charm_path):
+async def test_can_relate_to_lxd(
+    ops_test: OpsTest, constraints, charm_name, charm_config, charm_path
+):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -51,7 +61,7 @@ async def test_can_relate_to_lxd(ops_test: OpsTest, constraints, charm_name, cha
             charm_path,
             application_name=charm_name,
             num_units=1,
-            config={"use_embedded_etcd": True},
+            config=charm_config,
         ),
         ops_test.model.deploy(
             INTEGRATOR_CHARM_NAME,

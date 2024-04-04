@@ -23,9 +23,17 @@ from pytest_operator.plugin import OpsTest
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture(scope="module")
+def charm_config(snap_risk_level) -> dict:
+    cfg = {"use_embedded_etcd": True}
+    if snap_risk_level:
+        cfg.update(snap_risk_level=snap_risk_level)
+    return cfg
+
+
 @pytest.mark.abort_on_fail
 async def test_can_deploy_with_embedded_etcd(
-    ops_test: OpsTest, constraints, charm_name, charm_path
+    ops_test: OpsTest, constraints, charm_name, charm_path, charm_config
 ):
     """Build the charm-under-test and deploy it together with related charms.
 
@@ -39,7 +47,7 @@ async def test_can_deploy_with_embedded_etcd(
     await ops_test.model.deploy(
         charm_path,
         application_name=charm_name,
-        config={"use_embedded_etcd": True},
+        config=charm_config,
     )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[charm_name], status="active", timeout=1000)

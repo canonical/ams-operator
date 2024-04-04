@@ -22,6 +22,12 @@ import yaml
 def pytest_addoption(parser):
     parser.addoption("--constraints", default="", action="store", help="Model constraints")
     parser.addoption("--charm", default="", action="store", help="Path to a built charm")
+    parser.addoption(
+        "--snap-risk-level",
+        default="",
+        action="store",
+        help="Risk level to use for the snap deployed by the charm",
+    )
 
 
 @pytest.fixture
@@ -40,6 +46,11 @@ def constraints(request) -> dict:
         k, v = constraint.split("=")
         cts[k] = v
     return cts
+
+
+@pytest.fixture(scope="module")
+def snap_risk_level(request):
+    return request.config.getoption("--snap-risk-level")
 
 
 @pytest.fixture
