@@ -34,7 +34,7 @@ jobs:
     with:
       # TODO: change this when we actually want to cutover the charm to main
       # channels
-      channel: ${{ needs.get-version.outputs.version }}-ops/edge
+      channel: "${{ needs.get-version.outputs.version }}-ops/edge"
       artifact-prefix: ${{ needs.ci.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
