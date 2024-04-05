@@ -1,4 +1,4 @@
-name: Get current version
+name: Get current charm version
 
 on:
   workflow_call:
