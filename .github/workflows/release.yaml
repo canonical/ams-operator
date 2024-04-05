@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   get-version:
+    name: Get Charm Version
     uses: ./.github/workflows/get-version.yaml
 
   ci:
@@ -26,7 +27,7 @@ jobs:
       snap_risk_level: edge
 
   release:
-    name: Release charm
+    name: Release to edge
     needs:
       - ci
       - get-version
@@ -34,7 +35,7 @@ jobs:
     with:
       # TODO: change this when we actually want to cutover the charm to main
       # channels
-      channel: "${{ needs.get-version.outputs.version }}-ops/edge"
+      channel: "${{ needs.get-version.outputs.charm_version }}-ops/edge"
       artifact-prefix: ${{ needs.ci.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
