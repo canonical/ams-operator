@@ -31,7 +31,7 @@ jobs:
     needs:
       - ci
       - get-version
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v13.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@440a15a9e6662281be8746dc0e88c4daab85a8c3 # v16.4.0
     with:
       # TODO: change this when we actually want to cutover the charm to main
       # channels
